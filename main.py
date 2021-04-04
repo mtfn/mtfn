@@ -4,7 +4,7 @@ from random import randrange
 from traceback import format_exc
 from shutil import copyfile
 
-GRID_HEIGHT = 30
+GRID_HEIGHT = 16
 GRID_WIDTH = 16
 
 # I'm not putting emoji everywhere in the code
@@ -81,7 +81,7 @@ def main():
 
         # If needs new game
         if not mines:
-            mines = generateMines(99, selectedX, selectedY)
+            mines = generateMines(40, selectedX, selectedY)
             actionsEnv = "encrypt=true"
         overwriteAndClose(file, json.dumps(mines))
 
