@@ -1,0 +1,72 @@
+name: Move
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    if: startsWith(github.event.issue.title, 'game_')
+
+    steps:
+      - uses: actions/checkout@v2
+
+      # If latest commit ends in @whomever-opened-issue
+      - name: Prevent two moves in a row by the same user
+        run: |
+          if [[ "$(git show -s --format=%s)" =~ @${{ github.event.issue.user.login }}$ ]]; then
+            echo "unique_user=false" >> $GITHUB_ENV
+            echo "done=bad_input" >> $GITHUB_ENV
+          else
+            echo "unique_user=true" >> $GITHUB_ENV
+          fi
+
+      - name: Decrypt game data
+        run: gpg --quiet --batch --yes --decrypt --passphrase="$PASSPHRASE" --output mines.json mines.json.gpg
+        env:
+          PASSPHRASE: ${{secrets.PASSPHRASE}}
+        if: ${{env.unique_user == 'true'}}
+
+        # print() statement redirected to file
+      - name: Run a Python script and store output
+        run: python3 main.py ${{github.event.issue.title}} >> $GITHUB_ENV
+        if: ${{env.unique_user == 'true'}}
+
+      - name: Encrypt game data
+        run: |
+          rm -f mines.json.gpg
+          gpg --quiet --symmetric --batch --cipher-algo AES256 --passphrase="$PASSPHRASE" mines.json
+        env:
+          PASSPHRASE: ${{secrets.PASSPHRASE}}
+        if: ${{env.encrypt == 'true' && env.unique_user == 'true'}}
+
+        # Catch non-zero exit code from attempting to commit nothing
+      - name: Commit and push
+        run: |
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md prev-game.md field.json mines.json.gpg
+          git commit -m "${{github.event.issue.title}} by @${{github.event.issue.user.login}}" || echo "Performed no action"
+          git push origin master
+        if: ${{env.unique_user == 'true'}}
+
+      - name: Leave a comment and close issue
+        run: |
+          if [[ ${{env.unique_user}} == "false" ]]; then
+            export ISSUE_COMMENT="Let's keep it co-op here; you just went!"
+
+          elif [[ ${{env.done}} == "ok" ]]; then
+            export ISSUE_COMMENT="Go ahead and [check out your move](https://github.com/forkpoweroutlet/forkpoweroutlet/tree/master/${{ env.output_file }})!"
+
+          elif [[ ${{env.done}} == "bad_input" ]]; then
+            export ISSUE_COMMENT="Hmmm, can you check your input and that you clicked a tile to get here? That doesn't look like something I can read."
+
+          else
+            export ISSUE_COMMENT="Looks like something went wrong. Check your input, otherwise go ahead and [open a new issue](https://github.com/forkpoweroutlet/forkpoweroutlet/issues/new?title=Bug: )."
+          fi
+          
+          gh issue comment ${{github.event.issue.number}} --body "$ISSUE_COMMENT"
+          gh issue close ${{github.event.issue.number}}
+        env:
+          GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}

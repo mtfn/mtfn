@@ -1,0 +1,4 @@
+__*
+.vscode/
+mines.json
+!template/mines.json
