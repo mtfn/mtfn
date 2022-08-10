@@ -12,26 +12,28 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      # If latest commit ends in @whomever-opened-issue
+      # If latest commit was more or less than 100 seconds ago
       - name: Prevent two moves in a row by the same user
         run: |
-          if [[ "$(git show -s --format=%s)" =~ @${{ github.event.issue.user.login }}$ ]]; then
-            echo "unique_user=false" >> $GITHUB_ENV
+          TIME_LAST_COMMIT=$(git show -s --format=%ct)
+          TIME_NOW=$(date +%s)
+          if [[ $((TIME_NOW - TIME_LAST_COMMIT)) -lt 100 ]]; then
+            echo "cooldown_passed=false" >> $GITHUB_ENV
             echo "done=bad_input" >> $GITHUB_ENV
           else
-            echo "unique_user=true" >> $GITHUB_ENV
+            echo "cooldown_passed=true" >> $GITHUB_ENV
           fi
 
       - name: Decrypt game data
         run: gpg --quiet --batch --yes --decrypt --passphrase="$PASSPHRASE" --output mines.json mines.json.gpg
         env:
           PASSPHRASE: ${{secrets.PASSPHRASE}}
-        if: ${{env.unique_user == 'true'}}
+        if: ${{env.cooldown_passed == 'true'}}
 
         # print() statement redirected to file
       - name: Run a Python script and store output
         run: python3 main.py ${{github.event.issue.title}} >> $GITHUB_ENV
-        if: ${{env.unique_user == 'true'}}
+        if: ${{env.cooldown_passed == 'true'}}
 
       - name: Encrypt game data
         run: |
@@ -39,7 +41,7 @@ jobs:
           gpg --quiet --symmetric --batch --cipher-algo AES256 --passphrase="$PASSPHRASE" mines.json
         env:
           PASSPHRASE: ${{secrets.PASSPHRASE}}
-        if: ${{env.encrypt == 'true' && env.unique_user == 'true'}}
+        if: ${{env.encrypt == 'true' && env.cooldown_passed == 'true'}}
 
         # Catch non-zero exit code from attempting to commit nothing
       - name: Commit and push
@@ -49,12 +51,12 @@ jobs:
           git add README.md prev-game.md field.json mines.json.gpg
           git commit -m "${{github.event.issue.title}} by @${{github.event.issue.user.login}}" || echo "Performed no action"
           git push origin master
-        if: ${{env.unique_user == 'true'}}
+        if: ${{env.cooldown_passed == 'true'}}
 
       - name: Leave a comment and close issue
         run: |
-          if [[ ${{env.unique_user}} == "false" ]]; then
-            export ISSUE_COMMENT="Let's keep it co-op here; you just went!"
+          if [[ ${{env.cooldown_passed}} == "false" ]]; then
+            export ISSUE_COMMENT="Hey, slow down! Come back and try again in a minute or two."
 
           elif [[ ${{env.done}} == "ok" ]]; then
             export ISSUE_COMMENT="Go ahead and [check out your move](https://github.com/forkpoweroutlet/forkpoweroutlet/tree/master/${{ env.output_file }})!"
