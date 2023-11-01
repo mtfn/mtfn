@@ -59,13 +59,13 @@ jobs:
             export ISSUE_COMMENT="Hey, slow down! Come back and try again in a minute or two."
 
           elif [[ ${{env.done}} == "ok" ]]; then
-            export ISSUE_COMMENT="Go ahead and [check out your move](https://github.com/yeetus-skeetus/yeetus-skeetus/tree/master/${{ env.output_file }})!"
+            export ISSUE_COMMENT="Go ahead and [check out your move](https://github.com/mtfn/mtfn/tree/master/${{ env.output_file }})!"
 
           elif [[ ${{env.done}} == "bad_input" ]]; then
             export ISSUE_COMMENT="Hmmm, can you check your input and that you clicked a tile to get here? That doesn't look like something I can read."
 
           else
-            export ISSUE_COMMENT="Looks like something went wrong. Check your input, otherwise go ahead and [open a new issue](https://github.com/yeetus-skeetus/yeetus-skeetus/issues/new?title=Bug: )."
+            export ISSUE_COMMENT="Looks like something went wrong. Check your input, otherwise go ahead and [open a new issue](https://github.com/mtfn/mtfn/issues/new?title=Bug: )."
           fi
           
           gh issue comment ${{github.event.issue.number}} --body "$ISSUE_COMMENT"
